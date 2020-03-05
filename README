@@ -1,3 +1,7 @@
+A TinyDTLS fork whose sole purpose is stateful fuzzing of TinyDTLS. 
+The fuzzing framework was implemented largely by Ahmed Dawood.
+
+Old TinyDTLS readme:
 CONTENTS
 
 This library contains functions and structures that can help
