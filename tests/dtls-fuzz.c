@@ -152,9 +152,17 @@ static int dump_index = 0;
 static int
 send_to_peer(struct dtls_context_t *ctx, 
 	     session_t *session, uint8_t *data, size_t len) {
-  char base_name[MAX_FILENAME_LEN];
+  char base_name[MAX_FILENAME_LEN], *handshake_folder;
   if (dump_output_mode) {
-    sprintf(base_name, "%s/%d", PSK_HANDSHAKE_FOLDER, dump_index++);
+    if (ctx->h->get_psk_info != NULL) {
+      handshake_folder = PSK_HANDSHAKE_FOLDER;
+    } else if (ctx->h->get_ecdsa_key != NULL) {
+      handshake_folder = ECC_HANDSHAKE_FOLDER;
+    } else {
+      dtls_alert("One of PSK or ECDSA must be supported");
+      exit(0);
+    }
+    sprintf(base_name, "%s/%d", handshake_folder, dump_index++);
     FILE *f = fopen(base_name, "wb");
     fwrite(data, sizeof(uint8_t), len, f);
     fclose(f);
@@ -209,16 +217,12 @@ dtls_handle_read(struct dtls_context_t *ctx, uint8_t *buf, int len, int IS_SERVE
   session.size = sizeof(session.addr);
   populate_sockaddr((struct sockaddr_in *)&session.addr.sa);
 
-
   if (len < 0) {
     perror("fread");
     return -1;
   } else {
     dtls_debug("got %d bytes from fake port %d\n", len, 
 	     ntohs(session.addr.sin6.sin6_port));
-    if (sizeof(buf) < len) {
-      dtls_warn("packet was truncated (%d bytes lost)\n", (int)(len - sizeof(buf)));
-    }
   }
 
   return dtls_handle_message(ctx, &session, buf, len);
@@ -242,6 +246,8 @@ static dtls_handler_t sb = {
   .verify_ecdsa_key = verify_ecdsa_key
 };
 
+#define PSK_LEN
+
 int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order){
   dtls_context_t *the_server_context = NULL;
   dtls_context_t *the_client_context = NULL;
@@ -252,10 +258,19 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
   static uint8_t buf[MAX_READ_BUFF];
   char file_name[MAX_FILENAME_LEN], base_name[MAX_FILENAME_LEN];
   int on = 1, no_of_msg = 0, len = 0;
+  // 0 - message for the server, 1 - message for the client
+  int psk_roles[] = {0 /*CH*/, 1 /*HVR*/, 0 /*CH*/, 1 /*SH*/, 1 /*SHD*/,\
+                     0 /*CKE*/, 0 /*CCS*/, 0 /*FIN*/, 1 /*CCS*/, 1 /*FIN*/};
+  int ecc_roles[] = {0 /*CH*/, 1 /*HVR*/, 0 /*CH*/,\
+                     1 /*SH*/, 1 /*Cert*/, 1 /*SKE*/, 1 /*CertReq*/, 1 /*SHD*/,\
+                     0 /*Cert*/, 0 /*CKE*/,0 /*CertVer*/, 0 /*CCS*/, 0 /*FIN*/,\
+                     1 /*CCS*/, 1 /*FIN*/};
+  int * roles; // array 
   
   if(strcmp(crypt, "psk") == 0){
     sprintf(base_name, "%s/", PSK_HANDSHAKE_FOLDER);
-    no_of_msg = 10;
+    roles = psk_roles;
+    no_of_msg = sizeof(psk_roles) / sizeof(int);
     // disable ECDH
     cb.get_ecdsa_key = NULL;
     cb.verify_ecdsa_key = NULL;
@@ -264,7 +279,8 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
   }
   else if(strcmp(crypt, "ecc") == 0){
     sprintf(base_name, "%s/", ECC_HANDSHAKE_FOLDER);
-    no_of_msg = 15;
+    roles = ecc_roles;
+    no_of_msg = sizeof(ecc_roles) / sizeof(int);
     // disable PSK 
     cb.get_psk_info = NULL;
     sb.get_psk_info = NULL;
@@ -317,25 +333,13 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
     //   result = dtls_handle_read(the_server_context, f, 1);
     // }
     printf("Iteration %d\n",i);
-    switch (i)
-    {
-      case 0:
-      case 2:
-      case 5:
-      case 6:
-      case 7:
-        result = dtls_handle_read(the_server_context, buf, len, 1);
-        break;
-      case 1:
-      case 3:
-      case 4:
-      case 8:
-      case 9:
-        result = dtls_handle_read(the_client_context, buf, len, 0);
-        break;
     
-      default:
-        break;
+    if (!roles[i]) {
+      // server role (server should process it)
+      result = dtls_handle_read(the_server_context, buf, len, 1);
+    } else {
+      // client role (client should process it)
+      result = dtls_handle_read(the_client_context, buf, len, 0);
     }
 
     if(result){
