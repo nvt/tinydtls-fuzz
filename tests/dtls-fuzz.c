@@ -29,11 +29,16 @@ In doing so, it basically bypasses (UDP) sockets.
 #include "dtls-log.h"
 
 #define DEFAULT_PORT 20220
-#define READ_MAX_BUFF 2000
+#define MAX_READ_BUFF 2000
 #define MAX_FILENAME_LEN 100
 
 #define PSK_HANDSHAKE_FOLDER "handshakes/psk"
 #define ECC_HANDSHAKE_FOLDER "handshakes/ecc"
+
+#define PSK_IDENTITY "Client_identity"
+#define PSK_IDENTITY_LEN 15
+#define PSK_KEY      "\x12\x34"
+#define PSK_KEY_LEN 2
 
 static const unsigned char ecdsa_priv_key[] = {
 			0xD9, 0xE2, 0x70, 0x7A, 0x72, 0xDA, 0x6A, 0x05,
@@ -53,15 +58,7 @@ static const unsigned char ecdsa_pub_key_y[] = {
 			0xD0, 0x43, 0xB1, 0xFB, 0x03, 0xE2, 0x2F, 0x4D,
 			0x17, 0xDE, 0x43, 0xF9, 0xF9, 0xAD, 0xEE, 0x70};
 
-#if 0
-/* SIGINT handler: set quit to 1 for graceful termination */
-void
-handle_sigint(int signum) {
-  dsrv_stop(dsrv_get_context());
-}
-#endif
 
-#ifdef DTLS_PSK
 /* This function is the "key store" for tinyDTLS. It is called to
  * retrieve a key for the given identity within this particular
  * session. */
@@ -73,20 +70,17 @@ get_psk_info(struct dtls_context_t *ctx, const session_t *session,
   switch(type) {
     case DTLS_PSK_KEY:
 
-    memcpy(result, (unsigned char *)"\x12\x34", 2);
+    memcpy(result, (unsigned char *) PSK_KEY, PSK_KEY_LEN);
     return 2;
 
     case DTLS_PSK_IDENTITY:
-      memcpy(result,(unsigned char *) "Client_identity", 15);
+      memcpy(result,(unsigned char *) PSK_IDENTITY, PSK_IDENTITY_LEN);
       return 15;
     default: 
       return 0; 
   }
 }
 
-#endif /* DTLS_PSK */
-
-#ifdef DTLS_ECC
 static int
 get_ecdsa_key(struct dtls_context_t *ctx,
 	      const session_t *session,
@@ -110,7 +104,6 @@ verify_ecdsa_key(struct dtls_context_t *ctx,
 		 size_t key_size) {
   return 0;
 }
-#endif /* DTLS_ECC */
 
 #define DTLS_SERVER_CMD_CLOSE "server:close"
 #define DTLS_SERVER_CMD_RENEGOTIATE "server:renegotiate"
@@ -151,10 +144,21 @@ read_from_peer(struct dtls_context_t *ctx,
   return dtls_write(ctx, session, data, len);
 }
 
+// variables for handling dump output mode 
+static int dump_output_mode = 0;
+static int dump_index = 0;
+
 // sending is always successful 
 static int
 send_to_peer(struct dtls_context_t *ctx, 
 	     session_t *session, uint8_t *data, size_t len) {
+  char base_name[MAX_FILENAME_LEN];
+  if (dump_output_mode) {
+    sprintf(base_name, "%s/%d", PSK_HANDSHAKE_FOLDER, dump_index++);
+    FILE *f = fopen(base_name, "wb");
+    fwrite(data, sizeof(uint8_t), len, f);
+    fclose(f);
+  }
   dtls_debug_hexdump("sending", data, len);
   return len;
 }
@@ -162,7 +166,7 @@ send_to_peer(struct dtls_context_t *ctx,
 // we populate the address with valid data so that it passes checks
 void populate_sockaddr(struct sockaddr_in *sa) {
   sa->sin_family = AF_INET;
-  sa->sin_port = htons(55555);
+  sa->sin_port = htons(DEFAULT_PORT);
   sa->sin_addr.s_addr = inet_addr("127.0.0.1");
 }
 
@@ -176,8 +180,8 @@ void populate_peer(struct dtls_context_t *ctx, session_t* session) {
   handshake_params->compression = TLS_COMPRESSION_NULL;
   handshake_params->cipher = TLS_NULL_WITH_NULL_NULL;
   handshake_params->do_client_auth = 0;
-  strcpy(handshake_params->keyx.psk.identity, "Client_identity");
-  handshake_params->keyx.psk.id_length = 15;
+  strcpy(handshake_params->keyx.psk.identity, PSK_IDENTITY);
+  handshake_params->keyx.psk.id_length = PSK_IDENTITY_LEN;
 
   peer = dtls_new_peer(session);
   peer->role = DTLS_CLIENT;
@@ -224,26 +228,18 @@ static dtls_handler_t cb = {
   .write = send_to_peer,
   .read  = read_from_peer,
   .event = NULL,
-#ifdef DTLS_PSK
   .get_psk_info = get_psk_info,
-#endif /* DTLS_PSK */
-#ifdef DTLS_ECC
   .get_ecdsa_key = get_ecdsa_key,
   .verify_ecdsa_key = verify_ecdsa_key
-#endif /* DTLS_ECC */
 };
 
 static dtls_handler_t sb = {
   .write = send_to_peer,
   .read  = read_from_peer,
   .event = NULL,
-#ifdef DTLS_PSK
   .get_psk_info = get_psk_info,
-#endif /* DTLS_PSK */
-#ifdef DTLS_ECC
   .get_ecdsa_key = get_ecdsa_key,
   .verify_ecdsa_key = verify_ecdsa_key
-#endif /* DTLS_ECC */
 };
 
 int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order){
@@ -253,18 +249,25 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
   struct timeval timeout;
   int fd=100, opt, result;
   FILE *f = NULL;
-  static uint8_t buf[READ_MAX_BUFF];
+  static uint8_t buf[MAX_READ_BUFF];
   char file_name[MAX_FILENAME_LEN], base_name[MAX_FILENAME_LEN];
   int on = 1, no_of_msg = 0, len = 0;
-    
   
   if(strcmp(crypt, "psk") == 0){
     sprintf(base_name, "%s/", PSK_HANDSHAKE_FOLDER);
     no_of_msg = 10;
+    // disable ECDH
+    cb.get_ecdsa_key = NULL;
+    cb.verify_ecdsa_key = NULL;
+    sb.get_ecdsa_key = NULL;
+    sb.verify_ecdsa_key = NULL;
   }
   else if(strcmp(crypt, "ecc") == 0){
     sprintf(base_name, "%s/", ECC_HANDSHAKE_FOLDER);
     no_of_msg = 15;
+    // disable PSK 
+    cb.get_psk_info = NULL;
+    sb.get_psk_info = NULL;
   }
   else {
     dtls_alert("Invalid crypt value: Use \"psk\" or \"ecc\"\n");
@@ -279,12 +282,21 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
   dtls_set_handler(the_client_context, &cb);
   // FILE* writeFile = fopen("RESULT.txt", "a");
   
+  // initializing socket address
+  session_t session;
+  memset(&session, 0, sizeof(session_t));
+  session.size = sizeof(session.addr);
+  populate_sockaddr((struct sockaddr_in *)&session.addr.sa);
+  // this should kick-start the client
+  dtls_connect(the_client_context, &session);
+  populate_peer(the_client_context, &session);
+
   for (int i=0; i<no_of_msg; i++) {
     sprintf(file_name, "%s%d", base_name, i);
     
     if(i != packet_order){
       f = fopen(file_name, "rb");
-      len = fread(buf, sizeof *buf, READ_MAX_BUFF, f);
+      len = fread(buf, sizeof *buf, MAX_READ_BUFF, f);
       fclose(f);
       
       if (f == NULL) {
@@ -295,15 +307,6 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
     } else {
         memcpy(buf, record, size+1);
         len = size;
-    }
-
-    if(i == 0){
-      session_t session;
-      memset(&session, 0, sizeof(session_t));
-      session.size = sizeof(session.addr);
-      populate_sockaddr((struct sockaddr_in *)&session.addr.sa);
-      dtls_connect(the_client_context, &session);
-      populate_peer(the_client_context, &session);
     }
 
     // fprintf(writeFile, "/////////////////// %s ///////////////\n", argv[i+1]);
@@ -342,7 +345,7 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
       
       dtls_alert(response);
       //break;
-    }
+    } 
   }
 
  error:
@@ -358,44 +361,57 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
 
 int main(int argc, char **argv) {
   FILE *f = NULL;
-  static uint8_t buf[READ_MAX_BUFF];
+  static uint8_t buf[MAX_READ_BUFF];
   char *crypt;
   int packet_order = -1, len = 0;
-  #undef DTLS_ECC
+
   if (argc != 2 && argc != 4) {
-      dtls_alert("Usage: dtls_fuzz packet_file psk/ecc [packet_order]\n");
-      return 0;
+    char usage[10000];
+    strcpy(usage, "Usage: \n");
+    strcat(usage, "(regular mode) dtls_fuzz packet_file psk/ecc packet_order \n");
+    strcat(usage, "(dump output mode) dtls_fuzz psk/ecc");
+    puts(usage);
+    return 0;
   }
     
-  if(argc == 4){
+  if (argc == 2) {
+    dump_output_mode = 1;
+    crypt = argv[1];
+  } else if(argc == 4) {
     packet_order = atoi(argv[3]);
     crypt = argv[2];
   }
-  else {
-    const char s[] = ",";
-    char *token, *file_order, *filename;
-    filename = argv[1];
-    
-    /* get the first token */
-    token = strtok(filename, s);
-    
-    /* walk through other tokens */
-    while( token != NULL ) {
-      crypt = file_order;
-      file_order = token;
-      token = strtok(NULL, s);
-    }
-    packet_order = atoi(file_order);
-  }
+  //else if (argc == 3) {
+  //  const char s[] = ",";
+  //  char *token, *file_order, *filename;
+  //  filename = argv[1];
+  //  
+  //  /* get the first token */
+  //  token = strtok(filename, s);
+  //  
+  //  /* walk through other tokens */
+  //  while( token != NULL ) {
+  //    crypt = file_order;
+  //    file_order = token;
+  //    token = strtok(NULL, s);
+  //  }
+  //  packet_order = atoi(file_order);
+  //}
 
-  f = fopen(argv[1], "rb");
-  len = fread(buf, sizeof *buf, READ_MAX_BUFF, f);
-  fclose(f);
+  if (!dump_output_mode) {
+    f = fopen(argv[1], "rb");
+    len = fread(buf, sizeof *buf, MAX_READ_BUFF, f);
+    fclose(f);
+    f = NULL;
+  } else {
+    len = -1;
+    memset(buf, 0, MAX_READ_BUFF);
+  }
 
   fuzz_file(buf, len, crypt, packet_order);
 
- error:
-  if (!f) {
+  error:
+  if (f != NULL) {
     fclose(f);
   }
 
