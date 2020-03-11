@@ -246,8 +246,6 @@ static dtls_handler_t sb = {
   .verify_ecdsa_key = verify_ecdsa_key
 };
 
-#define PSK_LEN
-
 int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order){
   dtls_context_t *the_server_context = NULL;
   dtls_context_t *the_client_context = NULL;
@@ -332,7 +330,7 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
     // } else {
     //   result = dtls_handle_read(the_server_context, f, 1);
     // }
-    printf("Iteration %d\n",i);
+    // printf("Iteration %d\n",i);
     
     if (!roles[i]) {
       // server role (server should process it)
@@ -373,34 +371,41 @@ int main(int argc, char **argv) {
     char usage[10000];
     strcpy(usage, "Usage: \n");
     strcat(usage, "(regular mode) dtls_fuzz packet_file psk/ecc packet_order \n");
+    strcat(usage, "(compact mode) dtls_fuzz packet_file,psk/ecc,packet_order \n");
     strcat(usage, "(dump output mode) dtls_fuzz psk/ecc");
     puts(usage);
     return 0;
   }
-    
+  
+  puts(argv[1]);
   if (argc == 2) {
-    dump_output_mode = 1;
-    crypt = argv[1];
+    if (strchr(argv[1], ',') == NULL) {
+      dump_output_mode = 1;
+      crypt = argv[1];
+    } else {
+      const char s[] = ",";
+      char *token, *file_order, *file_name;
+      file_name = argv[1];
+      
+      /* get the first token, note that the supplied string will be broken into chunks
+        consequently, argv[1] will point to the first chunk of the string it initially pointed to
+       */
+      token = strtok(file_name, s);
+      
+      /* walk through other tokens */
+      while( token != NULL ) {
+        crypt = file_order;
+        file_order = token;
+        token = strtok(NULL, s);
+      }
+      packet_order = atoi(file_order);
+    }
   } else if(argc == 4) {
-    packet_order = atoi(argv[3]);
     crypt = argv[2];
+    packet_order = atoi(argv[3]);
   }
-  //else if (argc == 3) {
-  //  const char s[] = ",";
-  //  char *token, *file_order, *filename;
-  //  filename = argv[1];
-  //  
-  //  /* get the first token */
-  //  token = strtok(filename, s);
-  //  
-  //  /* walk through other tokens */
-  //  while( token != NULL ) {
-  //    crypt = file_order;
-  //    file_order = token;
-  //    token = strtok(NULL, s);
-  //  }
-  //  packet_order = atoi(file_order);
-  //}
+
+  puts(argv[1]);
 
   if (!dump_output_mode) {
     f = fopen(argv[1], "rb");
