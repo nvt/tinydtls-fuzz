@@ -10,11 +10,13 @@ In doing so, it basically bypasses (UDP) sockets.
 #define __APPLE_USE_RFC_3542
 
 #include <assert.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -178,6 +180,25 @@ void populate_sockaddr(struct sockaddr_in *sa) {
   sa->sin_addr.s_addr = inet_addr("127.0.0.1");
 }
 
+void make_dirs(char *path) {
+  char *sep = strchr(path, '/');
+  char aux[MAX_FILENAME_LEN];
+  // create subfolders
+  while (sep != NULL) {
+    strncpy(aux, path, sep-path);
+    if(mkdir(aux, 0777) && errno != EEXIST) {
+      printf("error while trying to create '%s'\n%m\n", aux);
+      exit(-1);
+    }
+    sep = strchr(sep+1, '/');
+  }
+  // then create the target folder
+  if(mkdir(path, 0777) && errno != EEXIST) {
+    printf("error while trying to create '%s'\n%m\n", path);
+    exit(-1);
+  }
+}
+
 // populate peer details
 void populate_peer(struct dtls_context_t *ctx, session_t* session) {
   dtls_peer_t *peer;
@@ -265,8 +286,12 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
                      1 /*CCS*/, 1 /*FIN*/};
   int * roles; // array 
   
+
   if(strcmp(crypt, "psk") == 0){
     sprintf(base_name, "%s/", PSK_HANDSHAKE_FOLDER);
+    if (dump_output_mode) {
+      make_dirs(PSK_HANDSHAKE_FOLDER);
+    }
     roles = psk_roles;
     no_of_msg = sizeof(psk_roles) / sizeof(int);
     // disable ECDH
@@ -277,6 +302,9 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
   }
   else if(strcmp(crypt, "ecc") == 0){
     sprintf(base_name, "%s/", ECC_HANDSHAKE_FOLDER);
+    if (dump_output_mode) {
+      make_dirs(ECC_HANDSHAKE_FOLDER);
+    }
     roles = ecc_roles;
     no_of_msg = sizeof(ecc_roles) / sizeof(int);
     // disable PSK 
@@ -377,7 +405,6 @@ int main(int argc, char **argv) {
     return 0;
   }
   
-  puts(argv[1]);
   if (argc == 2) {
     if (strchr(argv[1], ',') == NULL) {
       dump_output_mode = 1;
@@ -404,8 +431,6 @@ int main(int argc, char **argv) {
     crypt = argv[2];
     packet_order = atoi(argv[3]);
   }
-
-  puts(argv[1]);
 
   if (!dump_output_mode) {
     f = fopen(argv[1], "rb");
