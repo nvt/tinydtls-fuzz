@@ -16,15 +16,38 @@
 DTLS_SUPPORT   ?= posix
 LOG_LEVEL_DTLS ?= LOG_LEVEL_INFO
 
+OPT := -O0
+SRC_FILES = dtls-fuzz-libfuzzer.c
+
+ifdef libfuzz
+	SAN = -O -fsanitize=fuzzer -fno-omit-frame-pointer
+else
+	SRC_FILES = dtls-server.c ccm-test.c prf-test.c dtls-client.c dtls-fuzz.c
+        ifdef san
+                SAN = -O -fsanitize=address -fno-omit-frame-pointer
+        else
+                SAN =
+        endif
+endif
+
+# With coverage or not
+ifdef cov
+COV =  -fprofile-arcs -ftest-coverage
+else 
+COV = 
+endif
+
+DEBUG_MODE:= -g
+
 # files and flags
-SOURCES:= dtls-server.c ccm-test.c prf-test.c dtls-client.c
+SOURCES:= $(SRC_FILES)
   #cbc_aes128-test.c #dsrv-test.c
 PROGRAMS:= $(patsubst %.c, %, $(SOURCES))
 LIB:=../libtinydtls.a
 
 OBJECTS := $(patsubst %.c, %.o, $(SOURCES))
 
-CFLAGS  := -DLOG_LEVEL_DTLS=$(LOG_LEVEL_DTLS) -I. -I.. -I../$(DTLS_SUPPORT)
+CFLAGS  := $(OPT) $(COV) $(SAN) $(BITS) $(DEBUG_MODE) -DLOG_LEVEL_DTLS=$(LOG_LEVEL_DTLS) -I. -I.. -I../$(DTLS_SUPPORT)
 LDFLAGS := -L..
 LDLIBS  := -ltinydtls
 
