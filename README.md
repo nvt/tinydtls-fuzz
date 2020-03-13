@@ -45,7 +45,7 @@ The harness can automatically generate messages for PSK and ECC (with certificat
 The harness will execute the correspond handshake while at the same time dumping the bytes the SUT generates to files named 0, 1, 2... .
 These files are stored in 'handshakes', in a folder corresponding to the key exchange algorithm used ('psk' or 'ecc').
 
-# Message execution with replacement
+## Message execution with replacement
 Once messages for a handshake have been generated, the harness can re-execute them.
 Therein, it replaces one message (suggested by its index in the handshake) by another provided in a user-supplied file.
 This is useful for fuzzing from that point in the handshake.
@@ -61,7 +61,7 @@ The three arguments can be joined using ',' into a single argument, exercising t
 This can be useful when dealing with tools which do not support execution of the harness using more than one argument.
 
 
-#Old TinyDTLS readme
+# Old TinyDTLS README
 CONTENTS
 
 This library contains functions and structures that can help
