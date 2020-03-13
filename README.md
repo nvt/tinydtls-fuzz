@@ -24,16 +24,16 @@ We then generate handshake messages for a PSK handshake.
 > ./dtls-fuzzer psk
 
 The directories 'handshakes' and 'handshakes/psk' should have been created, with the latter containing files '0', '1'... .
-Each such file contains the contents of a DTLS message sent during the message, with the name suggesting the order of the message in the handshake sequence, with '0' being first, '1' second, etc.
-Perhaps you also noticed a lot of print-out, which included two "Handshake complete" logs, suggesting that both sides were able to complete the handshake.
+Each such file contains the contents of a DTLS message sent during execution, with the name suggesting the index the message in the handshake sequence.
+The extensive print-out should include two "Handshake complete" logs, suggesting that both sides were able to complete the handshake.
 This is because the handshake is actually executed as the messages are generated.
 
-We finally re-execute the handshake, replacing the fifth message (ClientKeyExchange) by the third (ClientHello):
+We finally (re-)execute the handshake, replacing the fifth message (ClientKeyExchange) by the first (ClientHello):
 
-> ./dtls-fuzzer handshakes/psk/0 psk 3
+> ./dtls-fuzzer handshakes/psk/0 psk 5
 
-If you check the logs again, you should find that only one of the sides was able to complete a handshake. 
-The side that was not was the server, since it did not receive the ClientKeyExchange message as expected.
+If you check the logs again, you should find that only one of the sides is able to complete a handshake. 
+The side that is not is the server, since it has not received the ClientKeyExchange message as expected.
 
 # Usage
 
