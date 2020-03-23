@@ -127,6 +127,11 @@ dtls_fill_random(uint8_t *buf, size_t len)
 
   fclose(urandom);
 
+  // Fuzzing change
+  for(int i=0; i<len; i++) {
+    buf[i] = 1;
+  }
+
   return 1;
 }
 
