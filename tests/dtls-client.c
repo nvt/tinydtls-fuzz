@@ -26,7 +26,7 @@
 #define DEFAULT_PORT 20220
 
 #define PSK_DEFAULT_IDENTITY "Client_identity"
-#define PSK_DEFAULT_KEY      "secretPSK"
+#define PSK_DEFAULT_KEY      "\x12\x34"
 #define PSK_OPTIONS          "i:k:"
 
 #ifdef __GNUC__
@@ -134,7 +134,8 @@ get_psk_info(struct dtls_context_t *ctx UNUSED_PARAM,
       return dtls_alert_fatal_create(DTLS_ALERT_INTERNAL_ERROR);
     }
 
-    memcpy(result, psk_key, psk_key_length);
+    //memcpy(result, psk_key, psk_key_length);
+    memcpy(result, (unsigned char *)"\x12\x34", 2);
     return psk_key_length;
   default:
     dtls_warn("unsupported request type: %d\n", type);

@@ -23,6 +23,7 @@
 #include "dtls-log.h"
 
 #define DEFAULT_PORT 20220
+#undef DTLS_ECC
 
 static const unsigned char ecdsa_priv_key[] = {
 			0xD9, 0xE2, 0x70, 0x7A, 0x72, 0xDA, 0x6A, 0x05,
@@ -49,7 +50,6 @@ handle_sigint(int signum) {
   dsrv_stop(dsrv_get_context());
 }
 #endif
-
 #ifdef DTLS_PSK
 /* This function is the "key store" for tinyDTLS. It is called to
  * retrieve a key for the given identity within this particular
@@ -67,11 +67,7 @@ get_psk_info(struct dtls_context_t *ctx, const session_t *session,
     size_t key_length;
   } psk[3] = {
     { (unsigned char *)"Client_identity", 15,
-      (unsigned char *)"secretPSK", 9 },
-    { (unsigned char *)"default identity", 16,
-      (unsigned char *)"\x11\x22\x33", 3 },
-    { (unsigned char *)"\0", 2,
-      (unsigned char *)"", 1 }
+      (unsigned char *)"\x12\x34", 2 }
   };
 
   if (type != DTLS_PSK_KEY) {
