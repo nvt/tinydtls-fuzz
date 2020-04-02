@@ -23,7 +23,6 @@
 #include "dtls-log.h"
 
 #define DEFAULT_PORT 20220
-#undef DTLS_ECC
 
 static const unsigned char ecdsa_priv_key[] = {
 			0xD9, 0xE2, 0x70, 0x7A, 0x72, 0xDA, 0x6A, 0x05,
@@ -335,7 +334,8 @@ main(int argc, char **argv) {
     FD_SET(fd, &rfds);
     /* FD_SET(fd, &wfds); */
     
-    timeout.tv_sec = 5;
+    /* Fuzzing edit: set DTLS retransmission timeout to long value) */
+    timeout.tv_sec = 50000;
     timeout.tv_usec = 0;
     
     result = select( fd+1, &rfds, &wfds, 0, &timeout);

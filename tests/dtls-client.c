@@ -471,7 +471,8 @@ main(int argc, char **argv) {
     FD_SET(fd, &rfds);
     /* FD_SET(fd, &wfds); */
     
-    timeout.tv_sec = 5;
+    /* Fuzzing edit: set DTLS retransmission timeout to big value) */
+    timeout.tv_sec = 50000;
     timeout.tv_usec = 0;
     
     result = select(fd+1, &rfds, &wfds, 0, &timeout);
