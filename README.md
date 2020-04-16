@@ -21,7 +21,7 @@ We begin by cleaning/compiling the sources.
 By setting LOG_LEVEL_DTLS to LOG_LEVEL_DBG we print out all logging data. 
 We then generate handshake messages for a PSK handshake.
 
-> ./dtls-fuzzer psk
+> ./dtls-fuzz psk
 
 The directories 'handshakes' and 'handshakes/psk' should have been created, with the latter containing files '0', '1'... .
 Each such file contains the contents of a DTLS message sent during execution, with the name suggesting the index the message in the handshake sequence.
@@ -30,7 +30,7 @@ This is because the handshake is actually executed as the messages are generated
 
 We finally (re-)execute the handshake, replacing the fifth message (ClientKeyExchange) by the first (ClientHello):
 
-> ./dtls-fuzzer handshakes/psk/0 psk 5
+> ./dtls-fuzz handshakes/psk/0 psk 5
 
 If you check the logs again, you should find that only one of the sides is able to complete a handshake. 
 The side that is not is the server, since it has not received the ClientKeyExchange message as expected.
@@ -40,7 +40,7 @@ The side that is not is the server, since it has not received the ClientKeyExcha
 ## Message generation
 The harness can automatically generate messages for PSK and ECC (with certificate required)  handshake. For that, you just run:
 
-> ./dtls-fuzzer psk/ecc
+> ./dtls-fuzz psk/ecc
 
 The harness will execute the correspond handshake while at the same time dumping the bytes the SUT generates to files named 0, 1, 2... .
 These files are stored in 'handshakes', in a folder corresponding to the key exchange algorithm used ('psk' or 'ecc').
