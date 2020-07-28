@@ -47,7 +47,7 @@ LIB:=../libtinydtls.a
 
 OBJECTS := $(patsubst %.c, %.o, $(SOURCES))
 
-CFLAGS  := $(OPT) $(COV) $(SAN) $(BITS) $(DEBUG_MODE) -DLOG_LEVEL_DTLS=$(LOG_LEVEL_DTLS) -I. -I.. -I../$(DTLS_SUPPORT)
+CFLAGS  := $(OPT) $(COV) $(SAN) $(BITS) $(DEBUG_MODE) -O0 -DLOG_LEVEL_DTLS=$(LOG_LEVEL_DTLS) -I. -I.. -I../$(DTLS_SUPPORT)
 LDFLAGS := -L..
 LDLIBS  := -ltinydtls
 
