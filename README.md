@@ -48,9 +48,9 @@ The harness will execute the correspond handshake while at the same time dumping
 These files are stored in 'handshakes', in a folder corresponding to the key exchange algorithm used ('psk' or 'ecc').
 
 ### Message visualization
-To visualize the essages generated you can use a hex viewer/editor (e.g. xxd, hexdump, hexedit).
+To visualize the messages generated you can use a hex viewer/editor (e.g. xxd, hexdump, hexedit).
 Alternatively, you can transform them to .pcap to view them on wireshark.
-The latter can be done using 'raw2udppcap.sh' found in 'scripts' directory.
+The latter can be done using the 'raw2udppcap.sh' script found in 'scripts' directory.
 
 ## Message execution with replacement
 Once messages for a handshake have been generated, the harness can re-execute them.
