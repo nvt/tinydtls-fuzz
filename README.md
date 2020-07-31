@@ -27,6 +27,8 @@ The directories 'handshakes' and 'handshakes/psk' should have been created, with
 Each such file contains the contents of a DTLS message sent during execution, with the name suggesting the index the message in the handshake sequence.
 The extensive print-out should include two "Handshake complete" logs, suggesting that both sides were able to complete the handshake.
 This is because the handshake is actually executed as the messages are generated.
+To visualize the raw messages generated you can use a hex viewer/editor (e.g. xxd, hexdump, hexedit).
+Alternatiively, you can transform them to pcap to view them on wireshark. we also include an adaptation of Hanno Böck
 
 We finally (re-)execute the handshake, replacing the fifth message (ClientKeyExchange) by the first (ClientHello):
 
@@ -44,6 +46,11 @@ The harness can automatically generate messages for PSK and ECC (with certificat
 
 The harness will execute the correspond handshake while at the same time dumping the bytes the SUT generates to files named 0, 1, 2... .
 These files are stored in 'handshakes', in a folder corresponding to the key exchange algorithm used ('psk' or 'ecc').
+
+### Message visualization
+To visualize the essages generated you can use a hex viewer/editor (e.g. xxd, hexdump, hexedit).
+Alternatively, you can transform them to .pcap to view them on wireshark.
+The latter can be done using 'raw2udppcap.sh' found in 'scripts' directory.
 
 ## Message execution with replacement
 Once messages for a handshake have been generated, the harness can re-execute them.
