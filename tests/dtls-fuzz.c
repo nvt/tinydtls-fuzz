@@ -26,7 +26,7 @@ In doing so, it basically bypasses (UDP) sockets.
 #include "tinydtls.h" 
 #include "dtls.h" 
 
-#define LOG_MODULE "dtls-server"
+#define LOG_MODULE "dtls-fuzz"
 #define LOG_LEVEL  LOG_LEVEL_DTLS
 #include "dtls-log.h"
 
@@ -267,6 +267,25 @@ static dtls_handler_t sb = {
   .verify_ecdsa_key = verify_ecdsa_key
 };
 
+void check_handshake_dir(char *dname, char *crypt) {
+  struct stat st;
+  if ( stat(dname, &st) == -1 || !S_ISDIR(st.st_mode)) {
+    dtls_alert("Expected handshake folder \"%s\" doesn't exist or is invalid.\n\
+    Generate it using dump output mode (i.e. running 'dtls_fuzz %s') and try again.\n",\
+    dname, crypt);
+    exit(EXIT_FAILURE);
+  }
+}
+
+void check_packet_file(char *pname) {
+  struct stat st;
+  if (stat(pname, &st) || !S_ISREG(st.st_mode)) {
+    dtls_alert("Packet file \"%s\" doesn't exist or is invalid.\n", pname);
+    exit(EXIT_FAILURE);
+  }
+}
+
+
 int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order){
   dtls_context_t *the_server_context = NULL;
   dtls_context_t *the_client_context = NULL;
@@ -291,6 +310,8 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
     sprintf(base_name, "%s/", PSK_HANDSHAKE_FOLDER);
     if (dump_output_mode) {
       make_dirs(PSK_HANDSHAKE_FOLDER);
+    } else {
+      check_handshake_dir(PSK_HANDSHAKE_FOLDER, crypt);
     }
     roles = psk_roles;
     no_of_msg = sizeof(psk_roles) / sizeof(int);
@@ -304,6 +325,8 @@ int fuzz_file(const uint8_t *record, size_t size, char* crypt, int packet_order)
     sprintf(base_name, "%s/", ECC_HANDSHAKE_FOLDER);
     if (dump_output_mode) {
       make_dirs(ECC_HANDSHAKE_FOLDER);
+    } else {
+      check_handshake_dir(ECC_HANDSHAKE_FOLDER, crypt);
     }
     roles = ecc_roles;
     no_of_msg = sizeof(ecc_roles) / sizeof(int);
@@ -433,6 +456,7 @@ int main(int argc, char **argv) {
   }
 
   if (!dump_output_mode) {
+    check_packet_file(argv[1]);
     f = fopen(argv[1], "rb");
     len = fread(buf, sizeof *buf, MAX_READ_BUFF, f);
     fclose(f);
