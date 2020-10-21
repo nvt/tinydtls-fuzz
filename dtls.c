@@ -2600,6 +2600,11 @@ check_server_hello(dtls_context_t *ctx,
     return dtls_alert_fatal_create(DTLS_ALERT_PROTOCOL_VERSION);
   }
 
+  /* Check that we have enough data. */
+  if(data_length < DTLS_RANDOM_LENGTH + sizeof(uint16_t)) {
+    goto error;
+  }
+
   data += sizeof(uint16_t);	      /* skip version field */
   data_length -= sizeof(uint16_t);
 
@@ -2620,6 +2625,11 @@ check_server_hello(dtls_context_t *ctx,
 	     data[0], data[1]);
     return dtls_alert_fatal_create(DTLS_ALERT_INSUFFICIENT_SECURITY);
   }
+
+  /* Check that we have enough data. */
+  if(data_length < sizeof(uint16_t)) {
+    goto error;
+  }
   data += sizeof(uint16_t);
   data_length -= sizeof(uint16_t);
 
@@ -2627,6 +2637,10 @@ check_server_hello(dtls_context_t *ctx,
   if (dtls_uint8_to_int(data) != TLS_COMPRESSION_NULL) {
     dtls_alert("unsupported compression method 0x%02x\n", data[0]);
     return dtls_alert_fatal_create(DTLS_ALERT_INSUFFICIENT_SECURITY);
+  }
+  /* Check that we have enough data. */
+  if(data_length < sizeof(uint8_t)) {
+    goto error;
   }
   data += sizeof(uint8_t);
   data_length -= sizeof(uint8_t);
