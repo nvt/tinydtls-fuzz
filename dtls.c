@@ -322,6 +322,10 @@ dtls_create_cookie(dtls_context_t *ctx,
   if (e + DTLS_HS_LENGTH > msglen)
     return dtls_alert_fatal_create(DTLS_ALERT_HANDSHAKE_FAILURE);
 
+  if(e > dtls_get_fragment_length(DTLS_HANDSHAKE_HEADER(msg))) {
+    return dtls_alert_fatal_create(DTLS_ALERT_HANDSHAKE_FAILURE);
+  }
+
   dtls_hmac_update(&hmac_context, 
 		   msg + DTLS_HS_LENGTH + e,
 		   dtls_get_fragment_length(DTLS_HANDSHAKE_HEADER(msg)) - e);
@@ -334,11 +338,6 @@ dtls_create_cookie(dtls_context_t *ctx,
   }
   
   memcpy(cookie, buf, *clen);
-
-  // Fuzzing change
-  for (int i=0; i<*clen; i++) {
-    cookie[i] = 1;
-  }
   return 0;
 }
 
@@ -1834,10 +1833,7 @@ dtls_send_server_hello(dtls_context_t *ctx, dtls_peer_t *peer)
   /* Set server random: First 4 bytes are the server's Unix timestamp,
    * followed by 28 bytes of generate random data. */
   dtls_ticks(&now);
-  // Fuzzing change
-  // dtls_int_to_uint32(handshake->tmp.random.server, now / DTLS_TICKS_PER_SECOND);
-  //
-  dtls_fill_random(handshake->tmp.random.server, 4);
+  dtls_int_to_uint32(handshake->tmp.random.server, now / DTLS_TICKS_PER_SECOND);
   dtls_fill_random(handshake->tmp.random.server + 4, 28);
 
   memcpy(p, handshake->tmp.random.server, DTLS_RANDOM_LENGTH);
